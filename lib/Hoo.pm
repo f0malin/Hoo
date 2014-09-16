@@ -6,6 +6,7 @@ use warnings FATAL => 'all';
 
 use base qw(Exporter);
 use Carp qw(croak);
+use Smart::Comments '###';
 
 =head1 NAME
 
@@ -18,7 +19,7 @@ Version 0.01
 =cut
 
 our $VERSION = '0.01';
-our @EXPORT_OK = qw(has);
+our @EXPORT_OK = qw(has t);
 our @EXPORT = @EXPORT_OK;
 
 =head1 SYNOPSIS
@@ -35,6 +36,7 @@ Perhaps a little code snippet.
 =cut
 
 our $_meta_classes = {};
+our $_engine = "mongodb";
 
 =head1 EXPORT
 
@@ -63,11 +65,131 @@ sub has {
     push @{$_meta_classes->{$pkg}->{'fields'}}, [$name, $field_options];
 }
 
-=head2 function2
+sub import {
+    my ($pkg) = caller;
+    no strict 'refs';
+    @{$pkg."::ISA"} = qw(Hoo);
+    use strict;
+    Hoo->export_to_level(1, @_);
+}
+
+sub engine {
+    $_engine = shift;
+}
+
+sub t {
+    return shift;
+}
+
+=head2 new
 
 =cut
 
-sub function2 {
+sub new {
+    my $pkg = shift;
+    my $self = bless {}, $pkg;
+    $self->set(@_);
+    return $self;
+}
+
+sub set {
+    my $self = shift;
+    my %params = @_;
+    for my $key (keys %params) {
+        if ($self->is_my_field($key)) {
+            $self->{$key} = $params{$key};
+        }
+    }
+}
+
+sub get {
+    my ($self, $key) = @_;
+    return $self->{$key};
+}
+
+sub validate {
+    my ($self) = @_;
+    my $fields = $self->meta_class->{fields};
+    my @errors;
+    for my $f (@$fields) {
+        my ($name, $options) = @$f;
+        my $v = $self->{$name};
+        my $label = $options->{label};
+        $label = got_label_from($name) unless $label;
+        # required
+        if ($options->{required}) {
+            if (!defined($v) || $v eq '') {
+                push @errors, sprintf(t("%s required"), $label);
+                next;
+            }
+        }
+        # have value
+        if ($v) {
+            # type
+            my $type = $options->{type};
+            if ($type eq 'int') {
+                if ($v !~ m{^\d+$}) {
+                    push @errors, sprintf(t("%s must be integer"), $label);
+                    next;
+                }
+            } elsif ($type eq 'select') {
+                if (!$self->in_options($v, $options->{options})) {
+                    push @errors, sprintf(t("%s got wrong option: %s"), $label, $v);
+                    next;
+                }
+            }
+            # validate
+            my $validate = $options->{validate};
+            if ($validate && ref($validate) eq 'CODE') {
+                my $ret = $validate->($self, $v, $label, $name);
+                if ($ret) {
+                    push @errors, $ret;
+                    next;
+                }
+            }
+        }
+    }
+    if (@errors) {
+        return \@errors;
+    } else {
+        return 0;
+    }
+}
+
+sub got_label_from {
+    my $name = shift;
+    my @parts = split /[_\-]+/, $name;
+    @parts = map {ucfirst $_} @parts;
+    return join " ", @parts;
+}
+
+sub in_options {
+    my ($self, $value, $options) = @_;
+    my @options = @$options;
+    my @options2 = @options;
+    while (my ($key, $label) = splice(@options2, 0, 2)) {
+        if ($key eq $value) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+sub is_my_field {
+    my ($self, $key) = @_;
+    my $fields = $self->meta_class->{fields};
+    for my $f (@$fields) {
+        if ($key eq $f->[0]) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+sub meta_class {
+    my $pkg = shift;
+    $pkg = ref($pkg) if ref($pkg);
+    return $_meta_classes->{$pkg};
 }
 
 =head1 AUTHOR

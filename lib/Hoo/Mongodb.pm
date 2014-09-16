@@ -20,12 +20,34 @@ sub db {
 sub insert {
     my ($pkg, $data) = @_;
     my $id = db->get_collection(pkg_to_col($pkg))->insert($data);
-    if ($id) {
+    if (my $err = got_error()) {
+        return $err;
+    } else {
         $data->{_id} = $id->value;
-        return 1;
+        return 0;
+    }
+}
+
+sub update {
+    my ($pkg, $cond, $data) = @_;
+    db->get_collection(pkg_to_col($pkg))->update($cond, {'$set' => $data});
+    if (my $err = got_error()) {
+        return $err;
     } else {
         return 0;
     }
+}
+
+sub got_error {
+    my $err = db()->last_error();
+    if ($err->{'ok'}) {
+        if ($err->{'err'}) {
+            return $err->{'err'};
+        }
+    } else {
+        return $err->{'errmsg'};
+    }
+    return 0;
 }
 
 sub find_one {

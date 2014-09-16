@@ -102,13 +102,20 @@ sub save {
     if ($errors) {
         return $errors;
     }
+
     if ($self->get('_id')) {
         $self->{update_at} = time();
-        ### to do 
+        my $err = &{$_engine."::update"}(ref($self), {_id => $self->{_id}}, $self);
+        if ($err) {
+            return [$err];
+        }
     } else {
         $self->{create_at} = time();
         $self->{update_at} = $self->{create_at};
-        &{$_engine."::insert"}(ref($self), $self);
+        my $err = &{$_engine."::insert"}(ref($self), $self);
+        if ($err) {
+            return [$err];
+        }
     }
     return 0;
 }

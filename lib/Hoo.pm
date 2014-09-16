@@ -2,6 +2,7 @@ package Hoo;
 
 use 5.006;
 use strict;
+no strict 'refs';
 use warnings FATAL => 'all';
 
 use base qw(Exporter);
@@ -36,7 +37,9 @@ Perhaps a little code snippet.
 =cut
 
 our $_meta_classes = {};
-our $_engine = "mongodb";
+our $_engine = "Hoo::Mongodb";
+our $_dsn = undef;
+our $_db = undef;
 
 =head1 EXPORT
 
@@ -67,18 +70,47 @@ sub has {
 
 sub import {
     my ($pkg) = caller;
-    no strict 'refs';
-    @{$pkg."::ISA"} = qw(Hoo);
-    use strict;
+    if ($pkg ne "main") {
+        @{$pkg."::ISA"} = qw(Hoo);
+    }
     Hoo->export_to_level(1, @_);
 }
 
 sub engine {
     $_engine = shift;
+    my $file = $_engine;
+    $file =~ s/::/\//g;
+    $file .= ".pm" unless $file =~ /\.pm$/;
+    require $file;
+}
+
+sub dsn {
+    my %dsn = @_;
+    croak "must provide db name" unless $dsn{'db'};
+    $dsn{host} = '127.0.0.1' unless $dsn{'host'};
+    $dsn{port} = '27017' unless $dsn{'port'};
+    $_dsn = \%dsn;
 }
 
 sub t {
     return shift;
+}
+
+sub save {
+    my $self = shift;
+    my $errors = $self->validate();
+    if ($errors) {
+        return $errors;
+    }
+    if ($self->get('_id')) {
+        $self->{update_at} = time();
+        ### to do 
+    } else {
+        $self->{create_at} = time();
+        $self->{update_at} = $self->{create_at};
+        &{$_engine."::insert"}(ref($self), $self);
+    }
+    return 0;
 }
 
 =head2 new
@@ -146,6 +178,13 @@ sub validate {
                     push @errors, $ret;
                     next;
                 }
+            }
+        }
+        # check unique
+        if ($options->{unique}) {
+            if (&{$_engine."::find_one"}(ref($self), {$name => $v})) {
+                push @errors, sprintf(t("duplicate value for %s"), $label);
+                next;
             }
         }
     }

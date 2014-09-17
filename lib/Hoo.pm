@@ -120,10 +120,14 @@ sub save {
         if (!defined($v) || $v eq '') {
             if (defined($options->{'default'})) {
                 $self->{$name} = $options->{'default'};
+            } elsif ($options->{'type'} eq 'int' || $options->{'type'} eq 'num') {
+                $self->{$name} = 0;
+            } else {
+                $self->{$name} = '';
             }
         }
         # convert
-        elsif ($options->{'type'} eq 'int') {
+        elsif ($options->{'type'} eq 'int' || $options->{'type'} eq 'num') {
             $self->{$name} += 0;
         }
     }
@@ -201,8 +205,13 @@ sub validate {
             # type
             my $type = $options->{type};
             if ($type eq 'int') {
-                if ($v !~ m{^\d+$}) {
+                if ($v !~ m{^-?\d+$}) {
                     push @errors, sprintf(t("%s must be integer"), $label);
+                    next;
+                }
+            } elsif ($type eq 'num') {
+                if ($v !~ m{^-?\d+\.?\d*$}) {
+                    push @errors, sprintf(t("%s must be number"), $label);
                     next;
                 }
             } elsif ($type eq 'select') {

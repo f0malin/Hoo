@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 28;
+use Test::More tests => 30;
 
 
 package Cat;
@@ -33,6 +33,11 @@ has 'age' => (
             return 0;
         }
     },
+);
+
+has 'score' => (
+    type => 'num',
+    label => 'my score'
 );
 
 package main;
@@ -108,3 +113,11 @@ $g->save();
 my $h = Cat->find_one({"name" => "Jerry"});
 is $h->get("age"), 8, "update";
 is $h->get("name"), "Jerry", "update";
+
+my $i = Cat->new(name => 'Tom', score => '35d');
+$errors = $i->validate;
+diag Dumper $errors;
+ok $errors->[0] =~ /number/, "num-validate";
+$i->set(score => '3.6');
+$errors = $i->save;
+is $errors, 0, "num-conversion";

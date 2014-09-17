@@ -5,12 +5,19 @@ use warnings;
 
 require "Hoo.pm";
 use MongoDB;
+use boolean;
 
 our $_db;
 
 sub init {
     for my $pkg (keys %{$Hoo::_meta_classes}) {
-        print $pkg, "\n";
+        my $fields = $Hoo::_meta_classes->{$pkg}->{fields};
+        for my $f (@$fields) {
+            my ($fname, $options) = @$f;
+            if ($options->{'unique'}) {
+                db()->get_collection(pkg_to_col($pkg))->ensure_index({$fname => 1}, {unique => true});
+            }
+        }
     }
 }
 

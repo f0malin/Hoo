@@ -148,6 +148,7 @@ sub save {
 
 sub find_one {
     my ($pkg, $cond) = @_;
+    $cond->{status} = 1 unless defined $cond->{status};
     my $o = &{$_engine."::find_one"}($pkg, $cond);
     bless $o, $pkg;
     return $o;

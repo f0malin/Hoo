@@ -3,9 +3,16 @@ package Hoo::Mongodb;
 use strict;
 use warnings;
 
+require "Hoo.pm";
 use MongoDB;
 
 our $_db;
+
+sub init {
+    for my $pkg (keys %{$Hoo::_meta_classes}) {
+        print $pkg, "\n";
+    }
+}
 
 sub db {
     if (!defined($_db)) {

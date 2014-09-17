@@ -76,8 +76,11 @@ sub import {
     Hoo->export_to_level(1, @_);
 }
 
-sub engine {
-    $_engine = shift;
+sub init {
+    my %dsn = @_;
+
+    # engine
+    $_engine = $dsn{'engine'};
     my @parts = split /::/, $_engine;
     croak t("package too long for engine") if scalar(@parts) > 5;
     for my $part (@parts) {
@@ -87,14 +90,15 @@ sub engine {
     $file =~ s/::/\//g;
     $file .= ".pm";
     require $file;
-}
 
-sub dsn {
-    my %dsn = @_;
+    # dsn
     croak "must provide db name" unless $dsn{'db'};
     $dsn{host} = '127.0.0.1' unless $dsn{'host'};
     $dsn{port} = '27017' unless $dsn{'port'};
     $_dsn = \%dsn;
+
+    # engine_init
+    &{$_engine."::init"}();
 }
 
 sub t {
@@ -147,10 +151,6 @@ sub find_one {
     my $o = &{$_engine."::find_one"}($pkg, $cond);
     bless $o, $pkg;
     return $o;
-}
-
-sub init {
-
 }
 
 =head2 new

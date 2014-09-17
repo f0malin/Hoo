@@ -149,6 +149,10 @@ sub find_one {
     return $o;
 }
 
+sub init {
+
+}
+
 =head2 new
 
 =cut

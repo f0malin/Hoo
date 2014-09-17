@@ -3,11 +3,6 @@ use warnings;
 
 use Test::More tests => 28;
 
-use Hoo;
-
-Hoo::engine("Hoo::Mongodb");
-Hoo::dsn(host => 'localhost', port => '27017', db => 'hoo_test');
-
 
 package Cat;
 
@@ -45,6 +40,11 @@ package main;
 use Data::Dumper qw(Dumper);
 
 #diag Dumper(Cat->meta_class);
+use Hoo;
+
+Hoo::engine("Hoo::Mongodb");
+Hoo::dsn(host => 'localhost', port => '27017', db => 'hoo_test');
+Hoo::init();
 
 my $c = Cat->new(name => 'Jerry3', color => 'bl', wrong_field => 'hahaha');
 is(Cat->meta_class->{fields}->[0]->[1]->{type}, "text", "has-field-option");

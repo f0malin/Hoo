@@ -78,9 +78,14 @@ sub import {
 
 sub engine {
     $_engine = shift;
+    my @parts = split /::/, $_engine;
+    croak t("package too long for engine") if scalar(@parts) > 5;
+    for my $part (@parts) {
+        croak t("invalid package name for engine") unless $part =~ /^\w+$/;
+    }
     my $file = $_engine;
     $file =~ s/::/\//g;
-    $file .= ".pm" unless $file =~ /\.pm$/;
+    $file .= ".pm";
     require $file;
 }
 

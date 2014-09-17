@@ -107,22 +107,46 @@ sub save {
     if ($errors) {
         return $errors;
     }
+    # conver and default
+    my $fields = $self->meta_class->{fields};
+    for my $f (@$fields) {
+        my ($name, $options) = @$f;
+        my $v = $self->{$name};
+        # default
+        if (!defined($v) || $v eq '') {
+            if (defined($options->{'default'})) {
+                $self->{$name} = $options->{'default'};
+            }
+        }
+        # convert
+        elsif ($options->{'type'} eq 'int') {
+            $self->{$name} += 0;
+        }
+    }
 
     if ($self->get('_id')) {
         $self->{update_at} = time();
-        my $err = &{$_engine."::update"}(ref($self), {_id => $self->{_id}}, $self);
+        my $err = &{$_engine."::update"}($self);
         if ($err) {
             return [$err];
         }
     } else {
         $self->{create_at} = time();
         $self->{update_at} = $self->{create_at};
-        my $err = &{$_engine."::insert"}(ref($self), $self);
+        $self->{status} = 1 if !defined($self->{status});
+        my $err = &{$_engine."::insert"}($self);
         if ($err) {
             return [$err];
         }
     }
     return 0;
+}
+
+sub find_one {
+    my ($pkg, $cond) = @_;
+    my $o = &{$_engine."::find_one"}($pkg, $cond);
+    bless $o, $pkg;
+    return $o;
 }
 
 =head2 new
@@ -194,7 +218,7 @@ sub validate {
         }
         # check unique
         if ($options->{unique}) {
-            if (&{$_engine."::find_one"}(ref($self), {$name => $v})) {
+            if (&{$_engine."::check_duplicate"}($self, $name)) {
                 push @errors, sprintf(t("duplicate value for %s"), $label);
                 next;
             }

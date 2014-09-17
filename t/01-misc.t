@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 21;
+use Test::More tests => 28;
 
 use Hoo;
 
@@ -25,6 +25,7 @@ has 'color' => (
     type => 'select',
     options => ['b' => 'black', 'bl' => 'blue', 'r' => 'red'],
     wrong_option2 => 'foo bar',
+    default => 'bl',
 );
 
 has 'age' => (
@@ -79,11 +80,12 @@ $errors = $c->validate;
 ok $errors->[2] =~ /too old/i, "validate-error-validate";
 
 Hoo::Mongodb::db()->get_collection('cat')->remove();
-my $d = Cat->new(name => "Jerry", color => "r", age => 7);
+my $d = Cat->new(name => "Jerry", age => "7");
 is $d->get("_id"), undef, "save-no-id-yet";
 $errors = $d->save();
 diag Dumper $errors;
 diag $d->get("_id");
+is $d->get("color"), "bl", "default";
 ok $d->get("_id"), "save-have-id-now";
 
 my $f = Cat->new(name => "Jerry", color => "b", age => "28");
@@ -91,3 +93,20 @@ $errors = $f->save();
 ok $errors, "unique";
 is $f->get("_id"), undef, "unique";
 diag Dumper($errors);
+
+# find one
+my $g = Cat->find_one({name => "Jerry"});
+is ref($g), "Cat", "find_one-package";
+is $g->get("age"), 7, "find_one-data";
+is $g->get("color"), "bl", "find_one-default";
+diag $g->get("_id");
+
+# status
+is $g->get("status"), 1, "status";
+
+# update
+$g->set("age" => "8");
+$g->save();
+my $h = Cat->find_one({"name" => "Jerry"});
+is $h->get("age"), 8, "update";
+is $h->get("name"), "Jerry", "update";

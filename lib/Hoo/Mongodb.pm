@@ -18,19 +18,21 @@ sub db {
 
 ##### interfaces #####
 sub insert {
-    my ($pkg, $data) = @_;
-    my $id = db->get_collection(pkg_to_col($pkg))->insert($data);
+    my ($self) = @_;
+    my $id = db->get_collection(self_to_col($self))->insert($self);
     if (my $err = got_error()) {
         return $err;
     } else {
-        $data->{_id} = $id->value;
+        $self->{_id} = $id->value;
         return 0;
     }
 }
 
 sub update {
-    my ($pkg, $cond, $data) = @_;
-    db->get_collection(pkg_to_col($pkg))->update($cond, {'$set' => $data});
+    my ($self) = @_;
+    my $cond = {_id => MongoDB::OID->new(value => $self->{_id})};
+    delete $self->{_id};
+    db->get_collection(self_to_col($self))->update($cond, $self);
     if (my $err = got_error()) {
         return $err;
     } else {
@@ -65,6 +67,25 @@ sub pkg_to_col {
     my $pkg = shift;
     $pkg =~ s/::/_/g;
     return lc $pkg;
+}
+
+sub self_to_col {
+    my $self = shift;
+    return pkg_to_col(ref($self));
+}
+
+sub check_duplicate {
+    my ($self, $fname) = @_;
+    my $cond = {$fname => $self->{$fname}};
+    if ($self->{_id}) {
+        $cond->{_id} = {'$ne' => MongoDB::OID->new(value => $self->{_id})};
+    }
+    my $o = db->get_collection(self_to_col($self))->find_one($cond);
+    if ($o) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 1;

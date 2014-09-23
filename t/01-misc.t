@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 30;
+use Test::More tests => 32;
 
 
 package Cat;
@@ -88,6 +88,7 @@ is $d->get("_id"), undef, "save-no-id-yet";
 $errors = $d->save();
 diag Dumper $errors;
 diag $d->get("_id");
+is ref($d->get("_id")), "MongoDB::OID", "id";
 is $d->get("color"), "bl", "default";
 ok $d->get("_id"), "save-have-id-now";
 
@@ -102,6 +103,7 @@ my $g = Cat->find_one({name => "Jerry"});
 is ref($g), "Cat", "find_one-package";
 is $g->get("age"), 7, "find_one-data";
 is $g->get("color"), "bl", "find_one-default";
+is ref($g->get("_id")), "MongoDB::OID", "id";
 diag $g->get("_id");
 
 # status

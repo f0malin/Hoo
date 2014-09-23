@@ -37,14 +37,14 @@ sub insert {
     if (my $err = got_error()) {
         return $err;
     } else {
-        $self->{_id} = $id->value;
+        $self->{_id} = $id;
         return 0;
     }
 }
 
 sub update {
     my ($self) = @_;
-    my $cond = {_id => MongoDB::OID->new(value => $self->{_id})};
+    my $cond = {_id => $self->{_id}};
     delete $self->{_id};
     db->get_collection(self_to_col($self))->update($cond, $self);
     if (my $err = got_error()) {
@@ -70,7 +70,6 @@ sub find_one {
     my ($pkg, $cond) = @_;
     my $o = db->get_collection(pkg_to_col($pkg))->find_one($cond);
     if ($o) {
-        $o->{_id} = $o->{_id}->value;
         return $o;
     } else {
         return 0;
@@ -92,7 +91,7 @@ sub check_duplicate {
     my ($self, $fname) = @_;
     my $cond = {$fname => $self->{$fname}};
     if ($self->{_id}) {
-        $cond->{_id} = {'$ne' => MongoDB::OID->new(value => $self->{_id})};
+        $cond->{_id} = {'$ne' => $self->{_id}};
     }
     my $o = db->get_collection(self_to_col($self))->find_one($cond);
     if ($o) {

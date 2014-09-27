@@ -76,6 +76,12 @@ sub find_one {
     }
 }
 
+sub find {
+    my ($pkg, $cond) = @_;
+    my @objs = db->get_collection(pkg_to_col($pkg))->find($cond)->all();
+    return @objs;
+}
+
 sub pkg_to_col {
     my $pkg = shift;
     $pkg =~ s/::/_/g;
@@ -85,6 +91,20 @@ sub pkg_to_col {
 sub self_to_col {
     my $self = shift;
     return pkg_to_col(ref($self));
+}
+
+sub id_to_str {
+    my $self = shift;
+    return $self->{'_id'}->value();
+}
+
+sub str_to_id {
+    my $str = shift;
+    if (ref($str) eq 'MongoDB::OID') {
+        return $str;
+    } else {
+        return MongoDB::OID->new(value => $str);
+    }
 }
 
 sub check_duplicate {

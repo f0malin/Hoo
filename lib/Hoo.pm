@@ -20,7 +20,7 @@ Version 0.01
 =cut
 
 our $VERSION = '0.01';
-our @EXPORT_OK = qw(has t);
+our @EXPORT_OK = qw(has t info);
 our @EXPORT = @EXPORT_OK;
 
 =head1 SYNOPSIS
@@ -37,6 +37,8 @@ Perhaps a little code snippet.
 =cut
 
 our $_meta_classes = {};
+our $_errors = {};
+
 our $_engine = "Hoo::Mongodb";
 our $_dsn = undef;
 our $_db = undef;
@@ -52,6 +54,12 @@ if you don't export anything, such as for a purely object-oriented module.
 
 =cut
 
+sub info {
+    my %info = @_;
+    my ($pkg) = caller();
+    $_meta_classes->{$pkg}->{'info'}->{'label'} = $info{'label'};
+}
+
 sub has {
     my $name = shift;
     my %options = @_;
@@ -64,6 +72,7 @@ sub has {
     $field_options->{'default'} = $options{'default'};
     $field_options->{'label'} = $options{'label'};
     $field_options->{'control'} = $options{'control'};
+    $field_options->{'ref'} = $options{'ref'};
     my ($pkg) = caller();
     push @{$_meta_classes->{$pkg}->{'fields'}}, [$name, $field_options];
 }
@@ -72,8 +81,8 @@ sub import {
     my ($pkg) = caller;
     if ($pkg ne "main") {
         @{$pkg."::ISA"} = qw(Hoo);
+        Hoo->export_to_level(1, @_);
     }
-    Hoo->export_to_level(1, @_);
 }
 
 sub init {
@@ -105,6 +114,24 @@ sub t {
     return shift;
 }
 
+sub push_error {
+    my ($self, $err) = @_;
+    my $pkg = ref $self;
+    push @{$_errors->{$pkg}}, $err;
+}
+
+sub clear_errors {
+    my ($self) = @_;
+    my $pkg = ref $self;
+    $_errors->{$pkg} = [];
+}
+
+sub errors {
+    my ($self) = @_;
+    my $pkg = ref $self;
+    return $_errors->{$pkg};
+}
+
 sub save {
     my $self = shift;
     my $errors = $self->validate();
@@ -116,6 +143,9 @@ sub save {
     for my $f (@$fields) {
         my ($name, $options) = @$f;
         my $v = $self->{$name};
+        if ($options->{'type'} eq 'ref') {
+            $v = $self->{$name."_id"};
+        }
         # default
         if (!defined($v) || $v eq '') {
             if (defined($options->{'default'})) {
@@ -158,6 +188,26 @@ sub find_one {
     return $o;
 }
 
+sub find {
+    my ($pkg, $cond) = @_;
+    $cond->{status} = 1 unless defined $cond->{status};
+    my @objs = &{$_engine."::find"}($pkg, $cond);
+    for my $o (@objs) {
+        bless $o, $pkg;
+    }
+    return @objs;
+}
+
+sub id_to_str {
+    my ($self) = @_;
+    return &{$_engine."::id_to_str"}($self);
+}
+
+sub label {
+    my $pkg = shift;
+    return $pkg->meta_class()->{'info'}->{'label'};
+}
+
 =head2 new
 
 =cut
@@ -173,8 +223,12 @@ sub set {
     my $self = shift;
     my %params = @_;
     for my $key (keys %params) {
-        if ($self->is_my_field($key)) {
-            $self->{$key} = $params{$key};
+        if (my $f = $self->is_my_field($key)) {
+            if ($f->[1]->{'type'} eq 'ref') {
+                $self->{$key."_id"} = &{$_engine. "::str_to_id"}($params{$key});
+            } else {
+                $self->{$key} = $params{$key};
+            }
         }
     }
 }
@@ -191,6 +245,9 @@ sub validate {
     for my $f (@$fields) {
         my ($name, $options) = @$f;
         my $v = $self->{$name};
+        if ($options->{'type'} eq 'ref') {
+            $v = $self->{$name . "_id"};
+        }
         my $label = $options->{label};
         $label = got_label_from($name) unless $label;
         # required
@@ -269,7 +326,7 @@ sub is_my_field {
     my $fields = $self->meta_class->{fields};
     for my $f (@$fields) {
         if ($key eq $f->[0]) {
-            return 1;
+            return $f;
         }
     }
     return 0;

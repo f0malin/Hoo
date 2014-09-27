@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 32;
+use Test::More tests => 33;
 
 
 package Cat;
@@ -58,34 +58,39 @@ is($c->get('name'), 'Jerry3', "new");
 is($c->get('color'), 'bl', "new");
 is($c->get('wrong_field'), undef, "new-wrong-field");
 
-my $errors = $c->validate;
+ok $c->validate, "validate-succeed";
+my $errors = $c->errors;
 #diag ref $c;
 
 is(ref($c), "Cat", "new-type");
 diag Dumper $errors;
-is $errors, 0, "validate-succeed";
+ok !$c->is_err, "validate-succeed";
 
 $c->set(color => "bb", name => "", age => "3");
 is $c->get("name"), "", "set";
 is $c->get("color"), "bb", "set";
-$errors = $c->validate;
-ok $errors, "validate-errors";
+$c->validate;
+$errors = $c->errors();
+ok $c->is_err(), "validate-errors";
 is scalar(@$errors), 2, "validate-errors-count";
 ok $errors->[0] =~ /required/i, "validate-error-required";
 ok $errors->[1] =~ /wrong option/i, "validate-error-select";
 $c->set(age => "bb");
-$errors = $c->validate;
+$c->validate;
+$errors = $c->errors;
 is scalar(@$errors), 3, "validate-errors-count";
 ok $errors->[2] =~ /int/i, "validate-error-int";
 
 $c->set(age => 120);
-$errors = $c->validate;
+$c->validate;
+$errors = $c->errors;
 ok $errors->[2] =~ /too old/i, "validate-error-validate";
 
 Hoo::Mongodb::db()->get_collection('cat')->remove();
 my $d = Cat->new(name => "Jerry", age => "7");
 is $d->get("_id"), undef, "save-no-id-yet";
-$errors = $d->save();
+$d->save();
+$errors = $d->errors;
 diag Dumper $errors;
 diag $d->get("_id");
 is ref($d->get("_id")), "MongoDB::OID", "id";
@@ -93,8 +98,9 @@ is $d->get("color"), "bl", "default";
 ok $d->get("_id"), "save-have-id-now";
 
 my $f = Cat->new(name => "Jerry", color => "b", age => "28");
-$errors = $f->save();
-ok $errors, "unique";
+$f->save();
+$errors = $f->errors;
+ok $f->is_err, "unique";
 is $f->get("_id"), undef, "unique";
 diag Dumper($errors);
 
@@ -117,9 +123,11 @@ is $h->get("age"), 8, "update";
 is $h->get("name"), "Jerry", "update";
 
 my $i = Cat->new(name => 'Tom', score => '35d');
-$errors = $i->validate;
+$i->validate;
+$errors = $i->errors;
 diag Dumper $errors;
 ok $errors->[0] =~ /number/, "num-validate";
 $i->set(score => '3.6');
-$errors = $i->save;
-is $errors, 0, "num-conversion";
+$i->save;
+$errors = $i->errors;
+ok !$i->is_err, "num-conversion";

@@ -132,11 +132,21 @@ sub errors {
     return $_errors->{$pkg};
 }
 
+sub is_err {
+    my ($self) = @_;
+    my $pkg = ref $self;
+    if ($_errors->{$pkg} && scalar(@{$_errors->{$pkg}}) > 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 sub save {
     my $self = shift;
-    my $errors = $self->validate();
-    if ($errors) {
-        return $errors;
+    $self->clear_errors;
+    if (!$self->validate()) {
+        return 0;
     }
     # conver and default
     my $fields = $self->meta_class->{fields};
@@ -166,7 +176,8 @@ sub save {
         $self->{update_at} = time();
         my $err = &{$_engine."::update"}($self);
         if ($err) {
-            return [$err];
+            $self->push_error($err);
+            return 0;
         }
     } else {
         $self->{create_at} = time();
@@ -174,10 +185,11 @@ sub save {
         $self->{status} = 1 if !defined($self->{status});
         my $err = &{$_engine."::insert"}($self);
         if ($err) {
-            return [$err];
+            $self->push_error($err);
+            return 0;
         }
     }
-    return 0;
+    return 1;
 }
 
 sub find_one {
@@ -240,8 +252,8 @@ sub get {
 
 sub validate {
     my ($self) = @_;
+    $self->clear_errors;
     my $fields = $self->meta_class->{fields};
-    my @errors;
     for my $f (@$fields) {
         my ($name, $options) = @$f;
         my $v = $self->{$name};
@@ -253,7 +265,7 @@ sub validate {
         # required
         if ($options->{required}) {
             if (!defined($v) || $v eq '') {
-                push @errors, sprintf(t("%s required"), $label);
+                $self->push_error(sprintf(t("%s required"), $label));
                 next;
             }
         }
@@ -263,17 +275,17 @@ sub validate {
             my $type = $options->{type};
             if ($type eq 'int') {
                 if ($v !~ m{^-?\d+$}) {
-                    push @errors, sprintf(t("%s must be integer"), $label);
+                    $self->push_error(sprintf(t("%s must be integer"), $label));
                     next;
                 }
             } elsif ($type eq 'num') {
                 if ($v !~ m{^-?\d+\.?\d*$}) {
-                    push @errors, sprintf(t("%s must be number"), $label);
+                    $self->push_error(sprintf(t("%s must be number"), $label));
                     next;
                 }
             } elsif ($type eq 'select') {
                 if (!$self->in_options($v, $options->{options})) {
-                    push @errors, sprintf(t("%s got wrong option: %s"), $label, $v);
+                    $self->push_error(sprintf(t("%s got wrong option: %s"), $label, $v));
                     next;
                 }
             }
@@ -282,7 +294,7 @@ sub validate {
             if ($validate && ref($validate) eq 'CODE') {
                 my $ret = $validate->($self, $v, $label, $name);
                 if ($ret) {
-                    push @errors, $ret;
+                    $self->push_error($ret);
                     next;
                 }
             }
@@ -290,15 +302,15 @@ sub validate {
         # check unique
         if ($options->{unique}) {
             if (&{$_engine."::check_duplicate"}($self, $name)) {
-                push @errors, sprintf(t("duplicate value for %s"), $label);
+                $self->push_error(sprintf(t("duplicate value for %s"), $label));
                 next;
             }
         }
     }
-    if (@errors) {
-        return \@errors;
-    } else {
+    if ($self->is_err()) {
         return 0;
+    } else {
+        return 1;
     }
 }
 
